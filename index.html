@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="An interactive cybersecurity training simulator focused on the STRIDE-lite threat modeling framework for Naresuan University CPE & IIE programs.">
+  <title>STRIDE Threat Modeler: System Audit Simulator</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&family=Source+Code+Pro:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Google Identity Services (GSI) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <!-- Retro terminal scanlines -->
+  <div class="scanlines" aria-hidden="true"></div>
+
+  <main class="app-shell">
+    <!-- Header -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="pulse-dot"></span>
+        <span class="brand-title">THREAT_MODELER_V2.1_</span>
+      </div>
+      <div class="session-info">
+        <button id="scanline-toggle-btn" class="btn-toggle-scanlines no-print" type="button">CRT SCREEN: ON</button>
+        <span id="player-badge" class="badge badge-dim is-hidden">AUDITOR: <span id="player-display-name">GUEST</span></span>
+        <span class="badge badge-success">ANALYSIS: ONLINE</span>
+      </div>
+      <div class="best-score-container">
+        <span class="score-label">HIGH_SCORE:</span>
+        <strong id="best-score">0000</strong>
+      </div>
+    </header>
+
+    <!-- Main Screens -->
+    <div class="screen-container">
+
+      <!-- SCREEN 1: Start / Login Screen -->
+      <section id="start-screen" class="screen">
+        <div class="terminal-intro">
+          <p class="cyber-subtitle">Naresuan University - Computer Engineering Lab</p>
+          <h1 class="cyber-title">STRIDE-LITE<br><span class="highlight">THREAT SIMULATOR</span></h1>
+          <p class="description">
+            Audit system architectures, inspect Data Flow Diagrams (DFDs), identify vulnerable components, classify threat events under STRIDE-lite, and deploy robust engineering safeguards.
+          </p>
+
+          <form id="login-form" class="auth-form">
+            <!-- Google Sign-In Container -->
+            <div id="google-login-section" class="google-login-section">
+              <p class="oauth-instruction" style="margin-bottom: 12px; font-size: 0.85rem; color: var(--color-text-muted); font-weight: 600; text-align: center;">
+                SECURE UNIVERSITY SIGN-IN REQUIRED (@nu.ac.th)
+              </p>
+              <div id="google-signin-btn" class="google-signin-btn" style="display: flex; justify-content: center;"></div>
+            </div>
+            
+            <div class="oauth-settings-trigger" style="text-align: center; margin-top: 10px;">
+              <button id="oauth-settings-btn" class="btn-settings-link" type="button">⚙️ Configure Google OAuth ID</button>
+            </div>
+          </form>
+
+          <div class="keyboard-note" aria-hidden="true">
+            <span>AUDIT RULES: View the active incident alert, inspect nodes on the DFD, classify the threat category, and select the best safeguard control.</span>
+          </div>
+        </div>
+
+        <!-- Right Diagnositc column -->
+        <aside class="diag-panel">
+          <div class="panel-header">STRIDE-LITE THREAT DIRECTORY</div>
+          <div class="panel-body">
+            <ul class="stride-directory-list">
+              <li><span class="s-badge">S</span> <strong>Spoofing</strong> (Masquerading identity)</li>
+              <li><span class="t-badge">T</span> <strong>Tampering</strong> (Modifying data at rest or in transit)</li>
+              <li><span class="r-badge">R</span> <strong>Repudiation</strong> (Denying actions performed)</li>
+              <li><span class="i-badge">I</span> <strong>Information Disclosure</strong> (Exposing confidential details)</li>
+              <li><span class="d-badge">D</span> <strong>Denial of Service</strong> (Exhausting system availability)</li>
+              <li><span class="e-badge">E</span> <strong>Elevation of Privilege</strong> (Acquiring unauthorized administrative rights)</li>
+            </ul>
+            <div class="diag-line text-warning">> STRIKES LIMIT: 3 INTRUSIONS ALLOWED BEFORE FIREWALL OVERLOADS.</div>
+          </div>
+        </aside>
+      </section>
+
+      <!-- SCREEN 2: Gameplay Dashboard -->
+      <section id="game-screen" class="screen is-hidden" aria-live="polite">
+        <!-- Sidebar controls -->
+        <aside class="game-sidebar">
+          <div class="stage-header">
+            <span id="level-badge" class="level-badge">LEVEL 1</span>
+            <h2 id="level-name" class="level-name">Student Project Portal</h2>
+          </div>
+
+          <div class="meters-container">
+            <div class="meter-group">
+              <span class="meter-label">ACCUMULATED SCORE</span>
+              <div class="value-box" id="score-display">0000</div>
+            </div>
+            <div class="meter-group">
+              <span class="meter-label">FIREWALL INTEGRITY</span>
+              <div id="lives-display" class="lives-indicator">
+                <span class="life-point active">🔐</span>
+                <span class="life-point active">🔐</span>
+                <span class="life-point active">🔐</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="progress-section">
+            <div class="progress-header">
+              <span>AUDIT PROGRESS</span>
+              <span id="progress-percent">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="progress-bar-fill" class="progress-bar-fill"></div>
+            </div>
+            <div id="progress-text" class="progress-text-sub">Threat 1 of 9</div>
+          </div>
+        </aside>
+
+        <!-- Central SVG DFD canvas -->
+        <article class="dfd-canvas-container">
+          <div class="canvas-header">
+            <span>DATA FLOW DIAGRAM (DFD) MODEL</span>
+            <button id="hint-button" class="btn btn-sm btn-outline" type="button">ACCESS HINT</button>
+          </div>
+          <!-- SVG layout goes here, dynamically populated in app.js -->
+          <div id="dfd-viewport" class="dfd-viewport">
+            <svg id="dfd-svg" class="dfd-svg" viewBox="0 0 600 300"></svg>
+          </div>
+          <div id="hint-panel" class="hint-panel is-hidden">
+            <div class="hint-header">HINT DATA DECRYPTED:</div>
+            <p id="hint-text"></p>
+          </div>
+        </article>
+
+        <!-- Right Auditing Panel -->
+        <aside class="audit-controls-panel">
+          <div class="panel-header">TACTICAL AUDIT MODULE</div>
+          
+          <div class="incident-card">
+            <span class="card-label">INCIDENT ALERT LOG:</span>
+            <p id="threat-prompt" class="threat-prompt">
+              Reading incident description payload...
+            </p>
+          </div>
+
+          <div class="audit-steps">
+            <!-- Step 1: Select Target Node -->
+            <div class="audit-step">
+              <span class="step-num">STEP 1:</span>
+              <span class="step-lbl">Select Vulnerable Node in DFD</span>
+              <div id="selected-node-display" class="selected-target-box">
+                [CLICK ON DIAGRAM NODE]
+              </div>
+            </div>
+
+            <!-- Step 2: STRIDE Classification -->
+            <div class="audit-step">
+              <span class="step-num">STEP 2:</span>
+              <span class="step-lbl">Classify Threat Vector under STRIDE</span>
+              <div class="stride-btn-grid">
+                <button type="button" class="stride-btn" data-stride="S">S</button>
+                <button type="button" class="stride-btn" data-stride="T">T</button>
+                <button type="button" class="stride-btn" data-stride="R">R</button>
+                <button type="button" class="stride-btn" data-stride="I">I</button>
+                <button type="button" class="stride-btn" data-stride="D">D</button>
+                <button type="button" class="stride-btn" data-stride="E">E</button>
+              </div>
+            </div>
+
+            <!-- Step 3: Security Controls -->
+            <div class="audit-step">
+              <span class="step-num">STEP 3:</span>
+              <span class="step-lbl">Select Engineering Mitigation Safeguard</span>
+              <div id="controls-list-container" class="controls-list-container">
+                <!-- Radio options of controls populated by app.js -->
+              </div>
+            </div>
+
+            <button id="submit-audit-btn" class="btn btn-primary btn-block" type="button" disabled>
+              SUBMIT AUDIT REPORT [ENTER]
+            </button>
+          </div>
+
+          <!-- Bottom Drawer Feedback -->
+          <div id="feedback-panel" class="feedback-panel is-hidden">
+            <div class="feedback-status">
+              <span id="feedback-icon"></span>
+              <strong id="feedback-title">AUDIT SUCCESSFUL</strong>
+            </div>
+            <p id="feedback-text" class="feedback-text"></p>
+            <button id="next-button" class="btn btn-success" type="button">LOAD NEXT INCIDENT [ENTER]</button>
+          </div>
+        </aside>
+      </section>
+
+      <!-- SCREEN 3: Results Dashboard -->
+      <section id="result-screen" class="screen is-hidden">
+        <div class="results-layout">
+          <div class="results-header">
+            <div class="badge badge-dim">AUDIT_PROTOCOL_FINISHED</div>
+            <h1 class="results-title">STRIDE THREAT EVALUATION SUMMARY</h1>
+            <p class="eval-summary">
+              Security diagnostics for Analyst <span id="eval-name" class="highlight">GUEST</span> (ID: <span id="eval-id">N/A</span>).
+            </p>
+          </div>
+
+          <div class="results-grid">
+            <div class="card result-card main-grade-card">
+              <div class="badge-graphic" id="eval-badge">🏆</div>
+              <h2 id="eval-title" class="security-rank">ELITE THREAT MODELING ARCHITECT</h2>
+              <p id="eval-desc" class="security-desc">Masterful analysis! You successfully secured the boundaries and classified threats according to STRIDE.</p>
+              <div class="score-summary">
+                <span class="lbl">TOTAL SCORE RATING:</span>
+                <strong id="eval-score" class="big-score">0000</strong>
+              </div>
+            </div>
+
+            <div class="card result-card stats-breakdown-card">
+              <h3>STRIDE METRICS BREAKDOWN</h3>
+              
+              <div class="stride-stat-bar-container">
+                <div class="stride-stat-row">
+                  <span>S - Spoofing</span>
+                  <span id="stat-s-val">0/2</span>
+                </div>
+                <div class="bar-container"><div id="stat-s-bar" class="stat-bar s-bar"></div></div>
+              </div>
+
+              <div class="stride-stat-bar-container">
+                <div class="stride-stat-row">
+                  <span>T - Tampering</span>
+                  <span id="stat-t-val">0/2</span>
+                </div>
+                <div class="bar-container"><div id="stat-t-bar" class="stat-bar t-bar"></div></div>
+              </div>
+
+              <div class="stride-stat-bar-container">
+                <div class="stride-stat-row">
+                  <span>R - Repudiation</span>
+                  <span id="stat-r-val">0/1</span>
+                </div>
+                <div class="bar-container"><div id="stat-r-bar" class="stat-bar r-bar"></div></div>
+              </div>
+
+              <div class="stride-stat-bar-container">
+                <div class="stride-stat-row">
+                  <span>I - Info Disclosure</span>
+                  <span id="stat-i-val">0/1</span>
+                </div>
+                <div class="bar-container"><div id="stat-i-bar" class="stat-bar i-bar"></div></div>
+              </div>
+
+              <div class="stride-stat-bar-container">
+                <div class="stride-stat-row">
+                  <span>D - Denial of Service</span>
+                  <span id="stat-d-val">0/1</span>
+                </div>
+                <div class="bar-container"><div id="stat-d-bar" class="stat-bar d-bar"></div></div>
+              </div>
+
+              <div class="stride-stat-bar-container">
+                <div class="stride-stat-row">
+                  <span>E - Elevation of Privilege</span>
+                  <span id="stat-e-val">0/2</span>
+                </div>
+                <div class="bar-container"><div id="stat-e-bar" class="stat-bar e-bar"></div></div>
+              </div>
+
+              <div class="time-stat">
+                <span>ELAPSED DURATION: </span>
+                <strong id="eval-time">00:00</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="results-actions">
+            <button id="show-cert-button" class="btn btn-primary" type="button">GENERATE TRAINING CERTIFICATE</button>
+            <button id="restart-button" class="btn btn-outline" type="button">RE-INITIALIZE SIMULATOR</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- MODAL: Printable Certificate -->
+  <div id="cert-modal" class="modal-overlay is-hidden" role="dialog" aria-modal="true" aria-labelledby="cert-title">
+    <div class="modal-container">
+      <button id="close-cert-button" class="modal-close" type="button" aria-label="Close modal">&times;</button>
+      
+      <div id="certificate" class="certificate-frame">
+        <div class="cert-border-glow"></div>
+        <div class="cert-body">
+          <div class="cert-header">
+            <div class="cert-logo">🛡️</div>
+            <div class="cert-institution">NARESUAN UNIVERSITY</div>
+            <div class="cert-department">Department of Electrical and Computer Engineering</div>
+          </div>
+
+          <h2 id="cert-title" class="cert-heading">CERTIFICATE OF TRAINING OUTCOME</h2>
+          <p class="cert-subtitle">This verifies the successful completion of the tactical training model on the</p>
+          <div class="cert-topic">STRIDE THREAT MODELING FRAMEWORK</div>
+          
+          <p class="cert-awarded">Awarded to</p>
+          <div class="cert-recipient" id="cert-recipient-name">John Doe</div>
+          <p class="cert-meta" id="cert-recipient-id">Student ID: 660601XXXX</p>
+
+          <div class="cert-outcomes-summary">
+            Verified as a qualified threat modeling analyst capable of identifying, classifying, and mitigating architectural software vulnerabilities.
+          </div>
+
+          <div class="cert-footer">
+            <div class="cert-sign">
+              <span class="sign-line"></span>
+              <span class="sign-name">THREAT MODELING LAB GM</span>
+              <span class="sign-title">Verification Authority</span>
+            </div>
+            <div class="cert-details">
+              <div class="cert-date-box">DATE: <span id="cert-date">2026-07-01</span></div>
+              <div class="cert-hash-box">HASH: <span id="cert-hash">SHA256_F98A7D...</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions no-print">
+        <button id="print-button" class="btn btn-primary" type="button">PRINT / SAVE AS PDF</button>
+        <button id="dismiss-modal-button" class="btn btn-outline" type="button">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="system-status-indicator no-print">
+    <span>SYSTEM: ACTIVE</span>
+  </div>
+
+  <!-- MODAL: OAuth Settings Configuration -->
+  <div id="oauth-settings-modal" class="modal-overlay is-hidden" role="dialog" aria-modal="true" aria-labelledby="oauth-settings-title">
+    <div class="modal-container modal-small">
+      <button id="close-oauth-modal-btn" class="modal-close" type="button" aria-label="Close modal">&times;</button>
+      <div class="card result-card">
+        <h2 id="oauth-settings-title" class="panel-header">GOOGLE OAUTH CONFIGURATION</h2>
+        <p class="description" style="font-size:0.85rem; margin-bottom:16px;">
+          To enable secure Naresuan University Google Sign-In for students, enter your Google Cloud Console Client ID. This setting is saved locally in this browser.
+        </p>
+        <div class="form-group" style="margin-bottom:16px; display:flex; flex-direction:column; gap:6px;">
+          <label for="oauth-client-id" style="font-family:var(--font-display); font-size:0.75rem; color:var(--color-text-muted);">Google Client ID</label>
+          <input id="oauth-client-id" type="text" placeholder="e.g. xxxxx.apps.googleusercontent.com" style="width:100%; background:var(--bg-terminal); border:1px solid var(--color-border); border-radius:6px; padding:12px; color:var(--color-text-main); font-family:var(--font-mono);">
+        </div>
+        <div class="modal-actions" style="margin-top:20px; display:flex; gap:12px; justify-content:flex-end;">
+          <button id="save-oauth-btn" class="btn btn-primary btn-sm" type="button">SAVE CONFIG</button>
+          <button id="clear-oauth-btn" class="btn btn-outline btn-sm" type="button">CLEAR</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game-core.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
