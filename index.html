@@ -83,6 +83,70 @@
         </aside>
       </section>
 
+      <!-- SCREEN: Knowledge Brief -->
+      <section id="brief-screen" class="screen is-hidden">
+        <div class="results-layout" style="max-width:960px; margin:0 auto; padding:32px 24px;">
+          <div class="results-header">
+            <div class="badge badge-dim">PRE-AUDIT INTELLIGENCE BRIEFING</div>
+            <h1 class="results-title">STRIDE THREAT MODELING — KNOWLEDGE BRIEF</h1>
+            <p class="description">Learn the STRIDE framework before auditing Data Flow Diagrams. Each scenario requires you to identify the threat category and apply the correct mitigation.</p>
+          </div>
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:14px; margin-bottom:24px;">
+            <div class="card result-card" style="border-top:3px solid #f43f5e;">
+              <div class="badge" style="background:rgba(244,63,94,0.1);color:#f43f5e;margin-bottom:10px;font-size:1rem;">S — SPOOFING</div>
+              <p style="font-size:0.83rem;color:var(--color-text-muted);margin-bottom:8px;"><strong style="color:var(--color-text-main);">Impersonating</strong> another user, process, or system to gain illegitimate access.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">EXAMPLE</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:6px;">Attacker forges a student login to access the grade portal.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">MITIGATION</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);">Strong Authentication — MFA, PKI certificates</p>
+            </div>
+            <div class="card result-card" style="border-top:3px solid #fb923c;">
+              <div class="badge" style="background:rgba(251,146,60,0.1);color:#fb923c;margin-bottom:10px;font-size:1rem;">T — TAMPERING</div>
+              <p style="font-size:0.83rem;color:var(--color-text-muted);margin-bottom:8px;"><strong style="color:var(--color-text-main);">Unauthorized modification</strong> of data in transit or at rest.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">EXAMPLE</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:6px;">MITM attack modifying grade values before they reach the database.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">MITIGATION</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);">Integrity checks — HMAC, TLS, Digital Signatures</p>
+            </div>
+            <div class="card result-card" style="border-top:3px solid #a78bfa;">
+              <div class="badge" style="background:rgba(167,139,250,0.1);color:#a78bfa;margin-bottom:10px;font-size:1rem;">R — REPUDIATION</div>
+              <p style="font-size:0.83rem;color:var(--color-text-muted);margin-bottom:8px;"><strong style="color:var(--color-text-main);">Denying</strong> that an action was performed, without proof of who did it.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">EXAMPLE</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:6px;">User denies deleting a submission — no audit log exists.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">MITIGATION</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);">Non-repudiation — Audit logs, Digital Signatures</p>
+            </div>
+            <div class="card result-card" style="border-top:3px solid #22d3ee;">
+              <div class="badge" style="background:rgba(34,211,238,0.1);color:#22d3ee;margin-bottom:10px;font-size:1rem;">I — INFO DISCLOSURE</div>
+              <p style="font-size:0.83rem;color:var(--color-text-muted);margin-bottom:8px;"><strong style="color:var(--color-text-main);">Exposing</strong> private data to unauthorized parties.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">EXAMPLE</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:6px;">Verbose error message leaks internal DB schema.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">MITIGATION</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);">Encryption, RBAC, generic error messages</p>
+            </div>
+            <div class="card result-card" style="border-top:3px solid #ef4444;">
+              <div class="badge" style="background:rgba(239,68,68,0.1);color:#ef4444;margin-bottom:10px;font-size:1rem;">D — DENIAL OF SERVICE</div>
+              <p style="font-size:0.83rem;color:var(--color-text-muted);margin-bottom:8px;"><strong style="color:var(--color-text-main);">Making a service unavailable</strong> by exhausting resources.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">EXAMPLE</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:6px;">Flood of login requests crashes the authentication service.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">MITIGATION</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);">Rate limiting, WAF, auto-scaling, CAPTCHA</p>
+            </div>
+            <div class="card result-card" style="border-top:3px solid #10b981;">
+              <div class="badge" style="background:rgba(16,185,129,0.1);color:#10b981;margin-bottom:10px;font-size:1rem;">E — ELEVATION OF PRIVILEGE</div>
+              <p style="font-size:0.83rem;color:var(--color-text-muted);margin-bottom:8px;"><strong style="color:var(--color-text-main);">Gaining unauthorized permissions</strong> beyond what was granted.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">EXAMPLE</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);margin-bottom:6px;">Student exploits unvalidated parameter to access admin panel.</p>
+              <div class="panel-header" style="font-size:0.7rem;margin-bottom:4px;">MITIGATION</div>
+              <p style="font-size:0.8rem;color:var(--color-text-muted);">Least privilege, RBAC, server-side authorization</p>
+            </div>
+          </div>
+          <div class="results-actions" style="justify-content:center;">
+            <button id="start-game-btn" class="btn btn-primary" type="button">BEGIN AUDIT SIMULATION ➔</button>
+          </div>
+        </div>
+      </section>
+
       <!-- SCREEN 2: Gameplay Dashboard -->
       <section id="game-screen" class="screen is-hidden" aria-live="polite">
         <!-- Sidebar controls -->
@@ -358,6 +422,10 @@
     </div>
   </div>
 
+  <!-- Firebase SDK (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script src="game-core.js"></script>
   <script src="app.js"></script>
 </body>

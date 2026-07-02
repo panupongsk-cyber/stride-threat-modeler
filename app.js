@@ -2,6 +2,18 @@
  * STRIDE-lite Threat Modeler - Application logic & SVG Engine controller
  */
 
+// Firebase initialization (itpe-practice project, gameResults collection)
+const _fbApp = firebase.initializeApp({
+  apiKey: "AIzaSyDOwWZssk7a19R5aYnKpqx2oiSfbNLNLXA",
+  authDomain: "itpe-practice.firebaseapp.com",
+  projectId: "itpe-practice",
+  storageBucket: "itpe-practice.firebasestorage.app",
+  messagingSenderId: "254567748345",
+  appId: "1:254567748345:web:c9e448ccfac9e249584828"
+});
+const _db = firebase.firestore();
+const _auth = firebase.auth();
+
 // State Control
 let state = {
   playerName: "GUEST",
@@ -32,6 +44,7 @@ let state = {
 // DOM References
 const screens = {
   start: document.getElementById("start-screen"),
+  brief: document.getElementById("brief-screen"),
   game: document.getElementById("game-screen"),
   result: document.getElementById("result-screen")
 };
@@ -207,8 +220,12 @@ document.addEventListener("DOMContentLoaded", () => {
           state.studentId = "STAFF/INSTRUCTOR";
         }
 
-        // Auto Login
-        initializeGame();
+        // Sign into Firebase with the Google credential (enables Firestore security rules)
+        const fbCredential = firebase.auth.GoogleAuthProvider.credential(response.credential);
+        _auth.signInWithCredential(fbCredential).catch(e => console.warn("Firebase sign-in:", e));
+
+        // Show knowledge brief before starting the game
+        showScreen("brief");
       } catch (err) {
         console.error("JWT credential parse error", err);
         alert("Failed to parse Google sign-in payload.");
@@ -240,6 +257,9 @@ document.addEventListener("DOMContentLoaded", () => {
   gameUI.nextButton.addEventListener("click", () => {
     advanceGame();
   });
+
+  // Brief screen: begin audit button
+  document.getElementById("start-game-btn").addEventListener("click", initializeGame);
 
   // Restart trigger
   resultUI.restartButton.addEventListener("click", () => {
@@ -665,6 +685,33 @@ function endSimulation() {
   if (state.score > best) {
     localStorage.setItem("stride_best_score", state.score);
     topbar.bestScore.textContent = state.score.toString().padStart(4, "0");
+  }
+
+  saveGameStats();
+}
+
+async function saveGameStats() {
+  if (!state.googleUserEmail) return;
+  try {
+    await _db.collection("gameResults").add({
+      gameId: "stride-threat-modeler",
+      playerName: state.playerName,
+      email: state.googleUserEmail,
+      studentId: state.studentId,
+      score: state.score,
+      breakdown: {
+        S: state.strideScores.S,
+        T: state.strideScores.T,
+        R: state.strideScores.R,
+        I: state.strideScores.I,
+        D: state.strideScores.D,
+        E: state.strideScores.E
+      },
+      timeTakenSeconds: state.timeElapsed,
+      completedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (e) {
+    console.error("Stats save failed:", e);
   }
 }
 
