@@ -2,23 +2,10 @@
  * STRIDE-lite Threat Modeler - Application logic & SVG Engine controller
  */
 
-// Firebase initialization (nu-cybersec-games project, gameResults collection)
-const _fbApp = firebase.initializeApp({
-  apiKey: "AIzaSyBjpwTbjBnKbD5KKxXmw5eRAx5IOoWI9nY",
-  authDomain: "nu-cybersec-games.firebaseapp.com",
-  projectId: "nu-cybersec-games",
-  storageBucket: "nu-cybersec-games.firebasestorage.app",
-  messagingSenderId: "771818733994",
-  appId: "1:771818733994:web:152ea862686c76aa912bd3"
-});
-const _db = firebase.firestore();
-const _auth = firebase.auth();
-
 // State Control
 let state = {
   playerName: "GUEST",
   studentId: "N/A",
-  googleUserEmail: null,
   currentLevelIdx: 0,
   threatIndex: 0,
   score: 0,
@@ -56,17 +43,6 @@ const topbar = {
 };
 
 const scanlineToggleBtn = document.getElementById("scanline-toggle-btn");
-
-const oauthUI = {
-  btnSettings: document.getElementById("oauth-settings-btn"),
-  modal: document.getElementById("oauth-settings-modal"),
-  closeBtn: document.getElementById("close-oauth-modal-btn"),
-  clientIdInput: document.getElementById("oauth-client-id"),
-  saveBtn: document.getElementById("save-oauth-btn"),
-  clearBtn: document.getElementById("clear-oauth-btn"),
-  loginSection: document.getElementById("google-login-section"),
-  googleBtn: document.getElementById("google-signin-btn")
-};
 
 const gameUI = {
   levelBadge: document.getElementById("level-badge"),
@@ -154,97 +130,6 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("scanlines_disabled", "true");
       }
     });
-  }
-
-  // OAuth Modal settings events
-  if (oauthUI.btnSettings) {
-    oauthUI.btnSettings.addEventListener("click", () => {
-      const savedId = localStorage.getItem("google_oauth_client_id") || "";
-      oauthUI.clientIdInput.value = savedId;
-      oauthUI.modal.classList.remove("is-hidden");
-    });
-  }
-  if (oauthUI.closeBtn) {
-    oauthUI.closeBtn.addEventListener("click", () => {
-      oauthUI.modal.classList.add("is-hidden");
-    });
-  }
-  if (oauthUI.saveBtn) {
-    oauthUI.saveBtn.addEventListener("click", () => {
-      const clientId = oauthUI.clientIdInput.value.trim();
-      if (clientId) {
-        localStorage.setItem("google_oauth_client_id", clientId);
-        oauthUI.modal.classList.add("is-hidden");
-        alert("Google OAuth Client ID saved successfully! Page reloading to apply...");
-        window.location.reload();
-      } else {
-        alert("Please enter a valid Client ID.");
-      }
-    });
-  }
-  if (oauthUI.clearBtn) {
-    oauthUI.clearBtn.addEventListener("click", () => {
-      localStorage.removeItem("google_oauth_client_id");
-      oauthUI.clientIdInput.value = "";
-      oauthUI.modal.classList.add("is-hidden");
-      alert("Google OAuth Client ID cleared. Page reloading...");
-      window.location.reload();
-    });
-  }
-
-  // Google OAuth GSI Initializer
-  const oauthId = localStorage.getItem("google_oauth_client_id") || "69112486306-t7mofej13egi7ape3t2cgs5l19tg6sp7.apps.googleusercontent.com";
-  if (oauthId && oauthUI.loginSection) {
-    oauthUI.loginSection.classList.remove("is-hidden");
-    
-    // GSI Global Handler
-    window.handleGoogleCredentialResponse = (response) => {
-      try {
-        const payload = JSON.parse(atob(response.credential.split(".")[1]));
-        const email = payload.email || "";
-        
-        // Locked to nu.ac.th Naresuan University
-        if (!email.toLowerCase().endsWith("@nu.ac.th")) {
-          alert("ACCESS DENIED: Google Sign-In is locked to Naresuan University accounts (@nu.ac.th).");
-          return;
-        }
-
-        state.playerName = payload.name || "STUDENT";
-        state.googleUserEmail = email;
-
-        // Auto-extract Student ID from email prefix if format: 660601XXXX@nu.ac.th
-        const studentIdMatch = email.match(/^(\d{10})@/);
-        if (studentIdMatch) {
-          state.studentId = studentIdMatch[1];
-        } else {
-          state.studentId = "STAFF/INSTRUCTOR";
-        }
-
-        // Sign into Firebase with the Google credential (enables Firestore security rules)
-        const fbCredential = firebase.auth.GoogleAuthProvider.credential(response.credential);
-        _auth.signInWithCredential(fbCredential).catch(e => console.warn("Firebase sign-in:", e));
-
-        // Show knowledge brief before starting the game
-        showScreen("brief");
-      } catch (err) {
-        console.error("JWT credential parse error", err);
-        alert("Failed to parse Google sign-in payload.");
-      }
-    };
-
-    // Render button
-    setTimeout(() => {
-      if (window.google && window.google.accounts) {
-        window.google.accounts.id.initialize({
-          client_id: oauthId,
-          callback: window.handleGoogleCredentialResponse
-        });
-        window.google.accounts.id.renderButton(
-          oauthUI.googleBtn,
-          { theme: "outline", size: "large", width: 280 }
-        );
-      }
-    }, 800);
   }
 
   // Form submit
@@ -687,32 +572,6 @@ function endSimulation() {
     topbar.bestScore.textContent = state.score.toString().padStart(4, "0");
   }
 
-  saveGameStats();
-}
-
-async function saveGameStats() {
-  if (!state.googleUserEmail) return;
-  try {
-    await _db.collection("gameResults").add({
-      gameId: "stride-threat-modeler",
-      playerName: state.playerName,
-      email: state.googleUserEmail,
-      studentId: state.studentId,
-      score: state.score,
-      breakdown: {
-        S: state.strideScores.S,
-        T: state.strideScores.T,
-        R: state.strideScores.R,
-        I: state.strideScores.I,
-        D: state.strideScores.D,
-        E: state.strideScores.E
-      },
-      timeTakenSeconds: state.timeElapsed,
-      completedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
-  } catch (e) {
-    console.error("Stats save failed:", e);
-  }
 }
 
 // Keyboard hooks
@@ -747,17 +606,14 @@ function handleKeyDown(e) {
 // Open Certificate Modal
 function openCertificate() {
   certUI.recipientName.textContent = state.playerName.toUpperCase();
-  let idText = state.studentId !== "N/A" && state.studentId.length > 0 ? `Student ID: ${state.studentId}` : "";
-  if (state.googleUserEmail) {
-    idText += ` | Account: ${state.googleUserEmail}`;
-  }
+  const idText = state.studentId !== "N/A" && state.studentId.length > 0 ? `Student ID: ${state.studentId}` : "";
   certUI.recipientId.textContent = idText;
 
   const today = new Date().toISOString().split("T")[0];
   certUI.date.textContent = today;
 
-  // Verify code hashing mock based on name, score, id, email, and date
-  const rawHash = `${state.playerName}_${state.score}_${state.studentId}_${state.googleUserEmail || ""}_${today}_STRIDE`;
+  // Verify code hashing mock based on name, score, id, and date
+  const rawHash = `${state.playerName}_${state.score}_${state.studentId}_${today}_STRIDE`;
   let val = 0;
   for (let i = 0; i < rawHash.length; i++) {
     val = (val << 5) - val + rawHash.charCodeAt(i);
