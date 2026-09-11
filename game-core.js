@@ -184,15 +184,15 @@ const LEVELS = [
         description: "An attacker gains internal write access to the Token Store memory database and injects fake active administrator session keys directly into memory.",
         stride: "T", // Tampering
         targetNode: "token_store",
-        mitigation: "Secure Database Config & Prepared Queries",
+        mitigation: "Least-Privilege DB Access Control & Encryption at Rest",
         controls: [
-          "Secure Database Config & Prepared Queries",
+          "Least-Privilege DB Access Control & Encryption at Rest",
           "Mutual TLS Cryptographic Authentication",
           "Application Layer WAF Protection Rules",
           "Scrubbing Center BGP Anycast Routing"
         ],
         hint: "This threat represents the modification of active data stores, inserting unauthorized records.",
-        explanation: "Tampering with databases or token stores is prevented by locking down database network access rules, using prepared queries to block injection routes, and encrypting tokens at rest."
+        explanation: "Tampering with databases or token stores is prevented by restricting write access to least-privileged service accounts, enforcing strict database ACLs, and encrypting tokens at rest so an insider with write access cannot forge valid session data."
       },
       {
         id: "T9",
