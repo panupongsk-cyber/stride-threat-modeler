@@ -175,6 +175,10 @@ body {
   display: none !important;
 }
 
+.is-hidden {
+  display: none !important;
+}
+
 /* SCREEN 1: Start Screen */
 #start-screen {
   grid-template-columns: 3fr 2fr;
@@ -882,6 +886,178 @@ body {
   color: var(--color-text-muted);
 }
 
+/* Chapter 2 reasoning checkpoints */
+.checkpoint-layout {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 40px;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.checkpoint-intro {
+  color: var(--color-text-muted);
+  max-width: 760px;
+  margin: 12px auto 0;
+}
+
+.checkpoint-card {
+  background-color: var(--bg-terminal);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 30px;
+}
+
+.checkpoint-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  margin-bottom: 18px;
+}
+
+.checkpoint-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  color: var(--color-s);
+  margin-bottom: 14px;
+}
+
+.checkpoint-prompt {
+  line-height: 1.65;
+  margin-bottom: 20px;
+}
+
+.checkpoint-options {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.checkpoint-builder {
+  gap: 16px;
+}
+
+.checkpoint-component-diagram {
+  background-color: rgba(0, 243, 255, 0.04);
+  border: 1px dashed var(--color-border);
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.checkpoint-component-diagram-title {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.checkpoint-component-diagram-summary {
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.checkpoint-component-flow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.checkpoint-component-context {
+  align-items: stretch;
+}
+
+.checkpoint-component-node {
+  background-color: var(--bg-terminal);
+  border: 1px solid var(--color-s);
+  border-radius: 4px;
+  color: var(--color-text-main);
+  font-size: 0.82rem;
+  padding: 8px 10px;
+}
+
+.checkpoint-component-arrow {
+  color: var(--color-s);
+  font-size: 1.1rem;
+}
+
+.checkpoint-builder-group {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  margin: 0;
+  min-width: 0;
+  padding: 14px;
+}
+
+.checkpoint-builder-label {
+  color: var(--color-s);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  padding: 0 6px;
+}
+
+.checkpoint-builder-options {
+  display: grid;
+  gap: 8px;
+}
+
+.checkpoint-builder-option {
+  font-size: 0.84rem;
+  padding: 10px 12px;
+}
+
+.checkpoint-option {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 14px 16px;
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+
+.checkpoint-option:hover {
+  border-color: var(--color-s);
+  color: var(--color-text-main);
+}
+
+.checkpoint-option.selected {
+  background-color: rgba(0, 243, 255, 0.05);
+  border-color: var(--color-s);
+  color: var(--color-text-main);
+}
+
+.checkpoint-feedback {
+  border: 1px solid var(--color-border);
+  border-top: 2px solid var(--color-success);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 18px;
+}
+
+.checkpoint-feedback.correct { border-top-color: var(--color-success); }
+.checkpoint-feedback.incorrect { border-top-color: var(--color-warning); }
+.checkpoint-feedback.correct .feedback-status strong { color: var(--color-success); }
+.checkpoint-feedback.incorrect .feedback-status strong { color: var(--color-warning); }
+
 /* SCREEN 3: Results Dashboard */
 .results-layout {
   background-color: var(--bg-secondary);
@@ -1011,13 +1187,14 @@ body {
 .i-bar { background-color: var(--color-i); }
 .d-bar { background-color: var(--color-d); }
 .e-bar { background-color: var(--color-e); }
+.ch2-bar { background-color: var(--color-warning); }
 
-.time-stat {
-  margin-top: 24px;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  text-align: center;
+.chapter-two-summary {
+  border-top: 1px solid var(--color-border);
   color: var(--color-text-muted);
+  font-size: 0.82rem;
+  margin-top: 18px;
+  padding-top: 16px;
 }
 
 .results-actions {
@@ -1441,4 +1618,3 @@ p.description, p.threat-prompt, p.feedback-text, .keyboard-note, .security-desc 
 .modal-small {
   max-width: 480px !important;
 }
-

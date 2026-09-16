@@ -10,9 +10,6 @@ let state = {
   threatIndex: 0,
   score: 0,
   lives: 3,
-  timeStart: 0,
-  timeElapsed: 0,
-  threatTimeStart: 0,
   strideScores: {
     S: { correct: 0, total: 2 },
     T: { correct: 0, total: 2 },
@@ -21,18 +18,32 @@ let state = {
     D: { correct: 0, total: 1 },
     E: { correct: 0, total: 2 }
   },
+  checkpointIndex: 0,
+  checkpointScores: { correct: 0, total: 0 },
+  selectedCheckpointOption: null,
+  selectedCheckpointParts: {},
+  checkpointLocked: false,
+  didRunDfdAudit: false,
   selectedNodeId: null,
   selectedStride: null,
   selectedControl: null,
-  isQuestionLocked: false,
-  timerInterval: null
+  isQuestionLocked: false
 };
+
+// Format summary dates from the browser's local calendar, not a UTC timestamp.
+function formatLocalSummaryDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 // DOM References
 const screens = {
   start: document.getElementById("start-screen"),
   brief: document.getElementById("brief-screen"),
   game: document.getElementById("game-screen"),
+  checkpoint: document.getElementById("checkpoint-screen"),
   result: document.getElementById("result-screen")
 };
 
@@ -67,6 +78,21 @@ const gameUI = {
   nextButton: document.getElementById("next-button")
 };
 
+const checkpointUI = {
+  mlo: document.getElementById("checkpoint-mlo"),
+  progress: document.getElementById("checkpoint-progress"),
+  title: document.getElementById("checkpoint-title"),
+  prompt: document.getElementById("checkpoint-prompt"),
+  options: document.getElementById("checkpoint-options"),
+  score: document.getElementById("checkpoint-score"),
+  submitButton: document.getElementById("submit-checkpoint-btn"),
+  feedbackPanel: document.getElementById("checkpoint-feedback"),
+  feedbackIcon: document.getElementById("checkpoint-feedback-icon"),
+  feedbackTitle: document.getElementById("checkpoint-feedback-title"),
+  feedbackText: document.getElementById("checkpoint-feedback-text"),
+  nextButton: document.getElementById("next-checkpoint-btn")
+};
+
 const resultUI = {
   evalName: document.getElementById("eval-name"),
   evalId: document.getElementById("eval-id"),
@@ -74,7 +100,6 @@ const resultUI = {
   evalTitle: document.getElementById("eval-title"),
   evalDesc: document.getElementById("eval-desc"),
   evalScore: document.getElementById("eval-score"),
-  evalTime: document.getElementById("eval-time"),
   restartButton: document.getElementById("restart-button"),
   showCertButton: document.getElementById("show-cert-button"),
   statSVal: document.getElementById("stat-s-val"),
@@ -88,7 +113,8 @@ const resultUI = {
   statDVal: document.getElementById("stat-d-val"),
   statDBar: document.getElementById("stat-d-bar"),
   statEVal: document.getElementById("stat-e-val"),
-  statEBar: document.getElementById("stat-e-bar")
+  statEBar: document.getElementById("stat-e-bar"),
+  dfdAuditSummary: document.getElementById("dfd-audit-summary")
 };
 
 const certUI = {
@@ -138,10 +164,16 @@ document.addEventListener("DOMContentLoaded", () => {
     initializeGame();
   });
 
+  document.getElementById("start-checkpoints-btn").addEventListener("click", initializeChapterTwoPractice);
+
   // Next button click
   gameUI.nextButton.addEventListener("click", () => {
     advanceGame();
   });
+
+  // Chapter 2 reasoning checkpoint controls
+  checkpointUI.submitButton.addEventListener("click", verifyChapterTwoCheckpoint);
+  checkpointUI.nextButton.addEventListener("click", advanceChapterTwoCheckpoint);
 
   // Brief screen: begin audit button
   document.getElementById("start-game-btn").addEventListener("click", initializeGame);
@@ -193,8 +225,9 @@ function showScreen(screenId) {
   });
 }
 
-// Reset state values
-function initializeGame() {
+// Reset state values shared by the independent Chapter 2 checkpoint route and
+// the optional legacy DFD audit route.
+function initializePracticeSession(didRunDfdAudit) {
   const nameEl = document.getElementById("player-name");
   const idEl = document.getElementById("student-id");
   if (nameEl) state.playerName = nameEl.value.trim() || "ANALYST";
@@ -203,7 +236,6 @@ function initializeGame() {
   state.threatIndex = 0;
   state.score = 0;
   state.lives = 3;
-  state.timeStart = Date.now();
   state.strideScores = {
     S: { correct: 0, total: 2 },
     T: { correct: 0, total: 2 },
@@ -212,19 +244,31 @@ function initializeGame() {
     D: { correct: 0, total: 1 },
     E: { correct: 0, total: 2 }
   };
+  state.checkpointIndex = 0;
+  state.checkpointScores = { correct: 0, total: CHAPTER_TWO_CHECKPOINTS.length };
+  state.selectedCheckpointOption = null;
+  state.selectedCheckpointParts = {};
+  state.checkpointLocked = false;
+  state.didRunDfdAudit = didRunDfdAudit;
   state.isQuestionLocked = false;
+  gameUI.nextButton.textContent = "LOAD NEXT INCIDENT [ENTER]";
 
   topbar.playerDisplayName.textContent = state.playerName.toUpperCase();
   topbar.playerBadge.classList.remove("is-hidden");
 
-  // Timer intervals
-  if (state.timerInterval) clearInterval(state.timerInterval);
-  state.timerInterval = setInterval(() => {
-    state.timeElapsed = Math.floor((Date.now() - state.timeStart) / 1000);
-  }, 1000);
+}
 
+// Preserve the original DFD experience as an optional extension.
+function initializeGame() {
+  initializePracticeSession(true);
   showScreen("game");
   loadThreatEvent();
+}
+
+// Chapter 2 outcomes can be practiced without completing the later DFD audit.
+function initializeChapterTwoPractice() {
+  initializePracticeSession(false);
+  startChapterTwoCheckpoints();
 }
 
 // Load current threat scenario details
@@ -244,7 +288,6 @@ function loadThreatEvent() {
 
   const level = LEVELS[state.currentLevelIdx];
   const threat = level.threats[state.threatIndex];
-  state.threatTimeStart = Date.now();
 
   // Set side info
   gameUI.levelBadge.textContent = `LEVEL ${level.id}`;
@@ -472,10 +515,9 @@ function verifyAuditReport() {
   const controlMatches = state.selectedControl === threat.mitigation;
 
   const isSuccess = nodeMatches && strideMatches && controlMatches;
-  const elapsed = Math.floor((Date.now() - state.threatTimeStart) / 1000);
 
   if (isSuccess) {
-    const pts = calculateScore(threat.points || 100, elapsed);
+    const pts = threat.points || 100;
     state.score += pts;
     state.strideScores[threat.stride].correct++;
     
@@ -506,14 +548,14 @@ function verifyAuditReport() {
   updateLivesDisplay();
 
   if (state.lives <= 0) {
-    gameUI.nextButton.textContent = "ABORT DIAGNOSTICS & VIEW REPORT [ENTER]";
+    gameUI.nextButton.textContent = "CONTINUE TO CHAPTER 2 CHECKPOINTS [ENTER]";
   }
 }
 
 // Step to next scenario
 function advanceGame() {
   if (state.lives <= 0) {
-    endSimulation();
+    startChapterTwoCheckpoints();
     return;
   }
 
@@ -527,29 +569,209 @@ function advanceGame() {
       state.threatIndex = 0;
       loadThreatEvent();
     } else {
-      endSimulation();
+      startChapterTwoCheckpoints();
     }
   }
 }
 
-// End simulation clocks and show reports
-function endSimulation() {
-  if (state.timerInterval) clearInterval(state.timerInterval);
+// Keep Chapter 2's complementary frameworks as separately scored formative
+// checkpoints rather than treating them as prerequisites for a later topic.
+function startChapterTwoCheckpoints() {
+  state.checkpointIndex = 0;
+  state.selectedCheckpointOption = null;
+  state.selectedCheckpointParts = {};
+  state.checkpointLocked = false;
+  state.checkpointScores = { correct: 0, total: CHAPTER_TWO_CHECKPOINTS.length };
+  showScreen("checkpoint");
+  loadChapterTwoCheckpoint();
+}
 
+function loadChapterTwoCheckpoint() {
+  const checkpoint = CHAPTER_TWO_CHECKPOINTS[state.checkpointIndex];
+  state.selectedCheckpointOption = null;
+  state.selectedCheckpointParts = {};
+  state.checkpointLocked = false;
+
+  checkpointUI.mlo.textContent = checkpoint.mlo;
+  checkpointUI.progress.textContent = `CHECKPOINT ${state.checkpointIndex + 1} OF ${CHAPTER_TWO_CHECKPOINTS.length}`;
+  checkpointUI.title.textContent = checkpoint.title;
+  checkpointUI.prompt.textContent = checkpoint.prompt;
+  checkpointUI.score.textContent = `CHECKPOINT SCORE: ${state.checkpointScores.correct}/${state.checkpointScores.total}`;
+  checkpointUI.submitButton.disabled = true;
+  checkpointUI.nextButton.textContent = state.checkpointIndex === CHAPTER_TWO_CHECKPOINTS.length - 1
+    ? "VIEW PRACTICE RESULT [ENTER]"
+    : "LOAD NEXT CHECKPOINT [ENTER]";
+  checkpointUI.feedbackPanel.className = "checkpoint-feedback is-hidden";
+  checkpointUI.options.classList.remove("checkpoint-builder");
+  checkpointUI.options.innerHTML = "";
+
+  if (Array.isArray(checkpoint.parts)) {
+    renderStructuredBuilder(checkpoint);
+    return;
+  }
+
+  checkpoint.options.forEach((option, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.id = `checkpoint-option-${index + 1}`;
+    button.className = "checkpoint-option";
+    button.dataset.optionId = option.id;
+    button.textContent = `${index + 1}. ${option.text}`;
+    button.addEventListener("click", () => {
+      if (state.checkpointLocked) return;
+      checkpointUI.options.querySelectorAll(".checkpoint-option").forEach((item) => item.classList.remove("selected"));
+      button.classList.add("selected");
+      state.selectedCheckpointOption = option.id;
+      checkpointUI.submitButton.disabled = false;
+    });
+    checkpointUI.options.appendChild(button);
+  });
+}
+
+function renderStructuredBuilder(checkpoint) {
+  checkpointUI.options.classList.add("checkpoint-builder");
+
+  if (checkpoint.diagram) {
+    const diagram = document.createElement("div");
+    diagram.className = "checkpoint-component-diagram";
+    diagram.setAttribute("role", "img");
+    diagram.setAttribute("aria-label", checkpoint.diagram.summary);
+
+    const title = document.createElement("p");
+    title.className = "checkpoint-component-diagram-title";
+    title.textContent = checkpoint.diagram.title;
+    diagram.appendChild(title);
+
+    const summary = document.createElement("p");
+    summary.className = "checkpoint-component-diagram-summary";
+    summary.textContent = checkpoint.diagram.summary;
+    diagram.appendChild(summary);
+
+    const flow = document.createElement("div");
+    const isContextOnly = checkpoint.diagram.layout === "context-cards";
+    flow.className = isContextOnly
+      ? "checkpoint-component-flow checkpoint-component-context"
+      : "checkpoint-component-flow";
+    checkpoint.diagram.nodes.forEach((node, index) => {
+      const nodeLabel = document.createElement("span");
+      nodeLabel.className = "checkpoint-component-node";
+      nodeLabel.textContent = node;
+      flow.appendChild(nodeLabel);
+
+      if (!isContextOnly && index < checkpoint.diagram.nodes.length - 1) {
+        const arrow = document.createElement("span");
+        arrow.className = "checkpoint-component-arrow";
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.textContent = "→";
+        flow.appendChild(arrow);
+      }
+    });
+    diagram.appendChild(flow);
+    checkpointUI.options.appendChild(diagram);
+  }
+
+  checkpoint.parts.forEach((part) => {
+    const group = document.createElement("fieldset");
+    group.className = "checkpoint-builder-group";
+
+    const legend = document.createElement("legend");
+    legend.className = "checkpoint-builder-label";
+    legend.textContent = part.label;
+    group.appendChild(legend);
+
+    const choices = document.createElement("div");
+    choices.className = "checkpoint-builder-options";
+    choices.setAttribute("aria-label", part.label);
+
+    part.options.forEach((option) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "checkpoint-option checkpoint-builder-option";
+      button.dataset.partId = part.id;
+      button.dataset.optionId = option.id;
+      button.setAttribute("aria-pressed", "false");
+      button.textContent = option.text;
+      button.addEventListener("click", () => {
+        if (state.checkpointLocked) return;
+
+        choices.querySelectorAll(".checkpoint-builder-option").forEach((item) => {
+          item.classList.remove("selected");
+          item.setAttribute("aria-pressed", "false");
+        });
+        button.classList.add("selected");
+        button.setAttribute("aria-pressed", "true");
+        state.selectedCheckpointParts[part.id] = option.id;
+        checkpointUI.submitButton.disabled = !checkpoint.parts.every((requiredPart) => (
+          state.selectedCheckpointParts[requiredPart.id]
+        ));
+      });
+      choices.appendChild(button);
+    });
+
+    group.appendChild(choices);
+    checkpointUI.options.appendChild(group);
+  });
+}
+
+function verifyChapterTwoCheckpoint() {
+  const checkpoint = CHAPTER_TWO_CHECKPOINTS[state.checkpointIndex];
+  const isStructuredCheckpoint = Array.isArray(checkpoint.parts);
+  const response = isStructuredCheckpoint
+    ? state.selectedCheckpointParts
+    : state.selectedCheckpointOption;
+  const hasResponse = isStructuredCheckpoint
+    ? checkpoint.parts.every((part) => response[part.id])
+    : response !== null;
+  if (state.checkpointLocked || !hasResponse) return;
+
+  const isCorrect = isCheckpointResponseCorrect(checkpoint, response);
+  state.checkpointLocked = true;
+  checkpointUI.submitButton.disabled = true;
+  checkpointUI.options.querySelectorAll("button").forEach((button) => {
+    button.disabled = true;
+  });
+
+  if (isCorrect) {
+    state.checkpointScores.correct++;
+    state.score += checkpoint.points || 100;
+    checkpointUI.feedbackPanel.className = "checkpoint-feedback correct";
+    checkpointUI.feedbackIcon.textContent = "✅";
+    checkpointUI.feedbackTitle.textContent = "REASONING CHECK VERIFIED [OK]";
+    checkpointUI.feedbackText.textContent = checkpoint.feedback.correct;
+  } else {
+    checkpointUI.feedbackPanel.className = "checkpoint-feedback incorrect";
+    checkpointUI.feedbackIcon.textContent = "↻";
+    checkpointUI.feedbackTitle.textContent = "REVIEW THE REASONING [RETRY NEXT]";
+    checkpointUI.feedbackText.textContent = checkpoint.feedback.incorrect;
+  }
+
+  checkpointUI.score.textContent = `CHECKPOINT SCORE: ${state.checkpointScores.correct}/${state.checkpointScores.total}`;
+}
+
+function advanceChapterTwoCheckpoint() {
+  if (!state.checkpointLocked) return;
+
+  if (state.checkpointIndex < CHAPTER_TWO_CHECKPOINTS.length - 1) {
+    state.checkpointIndex++;
+    loadChapterTwoCheckpoint();
+  } else {
+    endSimulation();
+  }
+}
+
+// End simulation and show reports.
+function endSimulation() {
   showScreen("result");
 
-  const outcome = evaluateThreatOutcome(state.strideScores);
+  const dfdOutcome = evaluateThreatOutcome(state.strideScores);
+  const checkpointOutcome = evaluateCheckpointOutcome(state.checkpointScores);
 
   resultUI.evalName.textContent = state.playerName.toUpperCase();
   resultUI.evalId.textContent = state.studentId;
-  resultUI.evalBadge.textContent = outcome.badge;
-  resultUI.evalTitle.textContent = outcome.title;
-  resultUI.evalDesc.textContent = outcome.description;
-  resultUI.evalScore.textContent = state.score.toString().padStart(4, "0");
-
-  const minutes = Math.floor(state.timeElapsed / 60).toString().padStart(2, "0");
-  const seconds = (state.timeElapsed % 60).toString().padStart(2, "0");
-  resultUI.evalTime.textContent = `${minutes}:${seconds}`;
+  resultUI.evalBadge.textContent = checkpointOutcome.badge;
+  resultUI.evalTitle.textContent = checkpointOutcome.title;
+  resultUI.evalDesc.textContent = checkpointOutcome.description;
+  resultUI.evalScore.textContent = `${state.checkpointScores.correct}/${state.checkpointScores.total}`;
 
   // Stat rows updates
   const setBar = (vector, idVal, idBar, total) => {
@@ -564,6 +786,9 @@ function endSimulation() {
   setBar("I", "stat-i-val", "stat-i-bar", 1);
   setBar("D", "stat-d-val", "stat-d-bar", 1);
   setBar("E", "stat-e-val", "stat-e-bar", 2);
+  resultUI.dfdAuditSummary.textContent = state.didRunDfdAudit
+    ? `${dfdOutcome.title}. ${dfdOutcome.description}`
+    : "Not attempted in this session. This optional DFD audit extension is not part of the Chapter 2 checkpoint outcome.";
 
   // Write high score cached
   const best = parseInt(localStorage.getItem("stride_best_score") || "0");
@@ -577,6 +802,23 @@ function endSimulation() {
 // Keyboard hooks
 function handleKeyDown(e) {
   const key = e.key;
+
+  if (!screens.checkpoint.classList.contains("is-hidden")) {
+    if (key === "Enter") {
+      if (state.checkpointLocked) {
+        advanceChapterTwoCheckpoint();
+      } else if (!checkpointUI.submitButton.disabled) {
+        verifyChapterTwoCheckpoint();
+      }
+      return;
+    }
+
+    if (!state.checkpointLocked && ["1", "2", "3", "4"].includes(key)) {
+      const optionButton = document.getElementById(`checkpoint-option-${key}`);
+      if (optionButton) optionButton.click();
+    }
+    return;
+  }
 
   if (key === "Enter") {
     if (!screens.game.classList.contains("is-hidden")) {
@@ -603,23 +845,16 @@ function handleKeyDown(e) {
   }
 }
 
-// Open Certificate Modal
+// Open local practice-summary modal
 function openCertificate() {
   certUI.recipientName.textContent = state.playerName.toUpperCase();
   const idText = state.studentId !== "N/A" && state.studentId.length > 0 ? `Student ID: ${state.studentId}` : "";
   certUI.recipientId.textContent = idText;
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = formatLocalSummaryDate();
   certUI.date.textContent = today;
 
-  // Verify code hashing mock based on name, score, id, and date
-  const rawHash = `${state.playerName}_${state.score}_${state.studentId}_${today}_STRIDE`;
-  let val = 0;
-  for (let i = 0; i < rawHash.length; i++) {
-    val = (val << 5) - val + rawHash.charCodeAt(i);
-    val |= 0;
-  }
-  certUI.hash.textContent = `SHA256_${Math.abs(val).toString(16).toUpperCase()}_STRIDE_NU`;
+  certUI.hash.textContent = "BROWSER-GENERATED — NOT VERIFIABLE";
 
   certUI.certModal.classList.remove("is-hidden");
 }

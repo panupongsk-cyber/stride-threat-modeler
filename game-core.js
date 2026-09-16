@@ -112,18 +112,18 @@ const LEVELS = [
       {
         id: "T5",
         title: "Transaction Repudiation",
-        description: "A student performs a payment transfer but later disputes it, claiming the request was never made. The payment system has no non-repudiation audit trails logged.",
+        description: "A student performs a payment transfer but later disputes it, claiming the request was never made. The payment system lacks protected audit evidence to support investigation of the recorded action.",
         stride: "R", // Repudiation
         targetNode: "audit_logs",
-        mitigation: "Cryptographically Signed Audit Logging",
+        mitigation: "Cryptographically Protected Audit Logging",
         controls: [
-          "Cryptographically Signed Audit Logging",
+          "Cryptographically Protected Audit Logging",
           "AES-256 Symmetric Database Row Encryption",
           "Strict Input Validation & Escaping Filters",
           "Mutual TLS Network Transport Verification"
         ],
-        hint: "This threat involves a user denying an action they performed because the system has no secure evidence to prove otherwise.",
-        explanation: "Repudiation represents denying actions. This is mitigated by writing system records to cryptographically signed, immutable logs, proving exactly when and who initiated transactions."
+        hint: "This threat involves a user denying an action because the system lacks protected evidence to assess the disputed record.",
+        explanation: "Repudiation represents denying actions. Protected, tamper-evident audit records can strengthen evidence linking a recorded action to an account or service and a time when identity binding, key custody, record integrity, clocks, and policy evidence are adequate. They do not alone prove that a specific human acted or establish non-repudiation in every setting."
       },
       {
         id: "T6",
@@ -150,12 +150,12 @@ const LEVELS = [
     nodes: [
       { id: "user", label: "User Client", type: "entity", x: 80, y: 150, desc: "External Entity: Student/Staff requesting central authentication." },
       { id: "sso_authenticator", label: "SSO Authenticator", type: "process", x: 260, y: 150, desc: "Process: Verification engine parsing credentials and signing tokens." },
-      { id: "token_store", label: "Token Store", type: "store", x: 440, y: 80, desc: "Data Store: Active session keys memory database." },
+      { id: "token_store", label: "Session State Store", type: "store", x: 440, y: 80, desc: "Data Store: Server-side session state and token-validation evidence." },
       { id: "campus_service", label: "Campus Service", type: "process", x: 440, y: 220, desc: "Process: Secondary resource server (e.g. HR console, Exam server) relying on SSO tokens." }
     ],
     flows: [
       { id: "flow_u_sso", from: "user", to: "sso_authenticator", label: "Login Credentials" },
-      { id: "flow_sso_ts", from: "sso_authenticator", to: "token_store", label: "Token Storage / Verification" },
+      { id: "flow_sso_ts", from: "sso_authenticator", to: "token_store", label: "Session-State Storage / Validation" },
       { id: "flow_sso_cs", from: "sso_authenticator", to: "campus_service", label: "Redirect with JWT Token" }
     ],
     boundaries: [
@@ -181,18 +181,18 @@ const LEVELS = [
       {
         id: "T8",
         title: "Active Token Tampering",
-        description: "An attacker gains internal write access to the Token Store memory database and injects fake active administrator session keys directly into memory.",
+        description: "An attacker gains internal write access to the server-side session-state store and injects fake active administrator session data.",
         stride: "T", // Tampering
         targetNode: "token_store",
-        mitigation: "Least-Privilege DB Access Control & Encryption at Rest",
+        mitigation: "Least-Privilege Session-Store Write Access & Server-side Validation",
         controls: [
-          "Least-Privilege DB Access Control & Encryption at Rest",
+          "Least-Privilege Session-Store Write Access & Server-side Validation",
           "Mutual TLS Cryptographic Authentication",
           "Application Layer WAF Protection Rules",
           "Scrubbing Center BGP Anycast Routing"
         ],
         hint: "This threat represents the modification of active data stores, inserting unauthorized records.",
-        explanation: "Tampering with databases or token stores is prevented by restricting write access to least-privileged service accounts, enforcing strict database ACLs, and encrypting tokens at rest so an insider with write access cannot forge valid session data."
+        explanation: "Tampering with session state is addressed by restricting and auditing writes, using least-privileged service accounts, and validating session or token evidence at the server. Encryption at rest can reduce disclosure from storage theft, but it does not stop a writer from altering state or forging session data."
       },
       {
         id: "T9",
@@ -214,36 +214,249 @@ const LEVELS = [
   }
 ];
 
-// Helper calculations
-function calculateScore(basePoints, timeElapsedSeconds, maxTimeSeconds = 60) {
-  if (timeElapsedSeconds >= maxTimeSeconds) {
-    return Math.floor(basePoints * 0.5);
+// Chapter 2 reasoning checkpoints. These are deliberately separate from the
+// DFD audit rounds: the chapter introduces several complementary lenses, and
+// none of the later chapters is a prerequisite for answering them.
+const CHAPTER_TWO_CHECKPOINTS = [
+  {
+    id: "C2-1",
+    mlo: "MLO2.1",
+    title: "Attack surface and attacker-model scope",
+    type: "scope-builder",
+    prompt: "Use the system context to construct a scoped note. Select one card in every field to inventory the attack surface, bound a hypothetical attacker model, distinguish those from a vulnerability or allegation, and state what evidence or constraint remains to check.",
+    diagram: {
+      title: "System context",
+      layout: "context-cards",
+      summary: "The synthetic Student Project Portal accepts project uploads, uses an email-provider dependency, and gives instructor accounts access to grading-related functions.",
+      nodes: ["Student browser", "Project-upload API", "Email-provider dependency", "Instructor account portal"]
+    },
+    parts: [
+      {
+        id: "attack-surface",
+        label: "1. Attack-surface inventory",
+        options: [
+          { id: "interaction-points", text: "Group the file-upload interface as an exposed application/API surface, the email provider as an external dependency, and instructor accounts as an identity/authorization surface to investigate." },
+          { id: "confirmed-vulnerabilities", text: "List only components that are already confirmed vulnerabilities." },
+          { id: "proved-compromise", text: "Treat every system flow as proof that a compromise occurred." },
+          { id: "real-identity", text: "Identify a real person who must be responsible for every component." }
+        ]
+      },
+      {
+        id: "attacker-model",
+        label: "2. Bounded attacker model",
+        options: [
+          { id: "bounded-hypothesis", text: "Describe a hypothetical actor's stated starting access, limits, and assumptions; do not attribute actions to a real person." },
+          { id: "certain-actor", text: "Name the person who definitely intends to misuse the portal." },
+          { id: "unlimited-access", text: "Assume the actor already has every privilege, without recording limits." },
+          { id: "no-assumptions", text: "Omit assumptions because an attacker model proves a vulnerability by itself." }
+        ]
+      },
+      {
+        id: "claim-boundary",
+        label: "3. Vulnerability or allegation boundary",
+        options: [
+          { id: "conditional-question", text: "Record a conditional question about a control or exposure; the inventory and model do not confirm a vulnerability, incident, or allegation." },
+          { id: "component-is-vulnerability", text: "Call each listed component a confirmed vulnerability." },
+          { id: "model-proves-allegation", text: "Use the hypothetical model as proof that a named person caused an incident." },
+          { id: "flow-is-evidence", text: "Treat a normal component flow as sufficient evidence of malicious intent." }
+        ]
+      },
+      {
+        id: "evidence-constraint",
+        label: "4. Evidence or constraint still needed",
+        options: [
+          { id: "check-controls-and-scope", text: "Check upload validation, dependency integration/configuration, account role policy, and relevant records; note the missing evidence and scope limits." },
+          { id: "skip-evidence", text: "Skip system evidence because the model and inventory already establish the conclusion." },
+          { id: "public-accusation", text: "Publish an allegation before checking the component configuration or records." },
+          { id: "unbounded-conclusion", text: "State that every interaction point has the same risk without considering controls or constraints." }
+        ]
+      }
+    ],
+    correctParts: {
+      "attack-surface": "interaction-points",
+      "attacker-model": "bounded-hypothesis",
+      "claim-boundary": "conditional-question",
+      "evidence-constraint": "check-controls-and-scope"
+    },
+    feedback: {
+      correct: "Correct. The scoped note groups exposed surfaces, bounds a hypothetical actor, separates those from a vulnerability or allegation, and identifies evidence still needed. Neither the inventory nor the model alone proves a weakness, an event, or a person's intent.",
+      incorrect: "Revisit the distinctions: an interaction point is not automatically a vulnerability, an attacker model records bounded assumptions rather than a real identity, and the next step is to check relevant controls and evidence."
+    }
+  },
+  {
+    id: "C2-2",
+    mlo: "MLO2.2",
+    title: "STRIDE threat scenario",
+    type: "scenario-builder",
+    prompt: "Use the component diagram to construct a cautious STRIDE scenario. Select one card in every field so that the scenario names the system element, STRIDE category, conditional effect, and evidence still needed.",
+    diagram: {
+      title: "Component diagram source",
+      summary: "A grading-related notification moves from a grade record through the Portal notification service to a course recipient group.",
+      nodes: ["Grade record", "Portal notification service", "Course recipient group"]
+    },
+    parts: [
+      {
+        id: "element",
+        label: "1. System element",
+        options: [
+          { id: "notification-service", text: "Portal notification service" },
+          { id: "student-browser", text: "Student browser" },
+          { id: "grade-database", text: "Grade database" },
+          { id: "bank-api", text: "External bank API" }
+        ]
+      },
+      {
+        id: "stride",
+        label: "2. STRIDE category",
+        options: [
+          { id: "information-disclosure", text: "Information Disclosure" },
+          { id: "spoofing", text: "Spoofing" },
+          { id: "denial-of-service", text: "Denial of Service" },
+          { id: "repudiation", text: "Repudiation" }
+        ]
+      },
+      {
+        id: "condition-effect",
+        label: "3. Conditional effect",
+        options: [
+          { id: "broad-recipients", text: "If the recipient policy or grouping is broader than needed, grading-related information could appear to unrelated people." },
+          { id: "confirmed-impersonation", text: "The service definitely impersonated a student." },
+          { id: "dependency-unavailable", text: "Every external dependency is unavailable by definition." },
+          { id: "proven-improper-message", text: "The observation proves an instructor already sent an improper message." }
+        ]
+      },
+      {
+        id: "evidence",
+        label: "4. Evidence still needed",
+        options: [
+          { id: "check-policy", text: "Check the recipient policy, recipient list, and message content." },
+          { id: "no-further-evidence", text: "No further evidence is needed because the event is already proved." },
+          { id: "attribute-person", text: "Identify the individual responsible before checking the system evidence." },
+          { id: "assume-impact", text: "Assume the highest impact without checking the recipient scope." }
+        ]
+      }
+    ],
+    correctParts: {
+      element: "notification-service",
+      stride: "information-disclosure",
+      "condition-effect": "broad-recipients",
+      evidence: "check-policy"
+    },
+    feedback: {
+      correct: "Correct. The constructed scenario names an element, a conditional confidentiality effect, and the evidence still needed. STRIDE is a question framework, not proof that an incident occurred.",
+      incorrect: "A useful STRIDE scenario connects an element or data flow, a condition, a possible effect on an asset, and an uncertainty to check. It should not turn an initial observation into a confirmed incident."
+    }
+  },
+  {
+    id: "C2-3",
+    mlo: "MLO2.3",
+    title: "Cyber Kill Chain as a conceptual sequence",
+    prompt: "A synthetic narrative contains a message claiming to be Portal support, credentials entered by a user, a recorded account-use attempt, and a broad file-list request. What is the best conceptual Cyber Kill Chain reading?",
+    options: [
+      {
+        id: "A",
+        text: "The narrative proves a complete attack and identifies the actor's intent."
+      },
+      {
+        id: "B",
+        text: "One control, such as an audit log, necessarily stops every stage of the narrative."
+      },
+      {
+        id: "C",
+        text: "Read the observations as a broad sequence, ask where identity verification could interrupt account use, and ask where account and authorization records could support later analysis; neither point proves the whole story."
+      },
+      {
+        id: "D",
+        text: "ATT&CK requires every event to follow one fixed Kill Chain sequence."
+      }
+    ],
+    correctOption: "C",
+    feedback: {
+      correct: "Correct. The Kill Chain is a broad temporal lens for finding possible interruption, detection, and impact-limiting points. A control has a bounded role and the observations still require context.",
+      incorrect: "Use the Kill Chain to reason about a broad sequence and possible points to interrupt or observe it. It is not proof of an attack, a fixed script for every event, or a guarantee that one control stops all stages."
+    }
+  },
+  {
+    id: "C2-4",
+    mlo: "MLO2.4",
+    title: "MITRE ATT&CK tactic reasoning",
+    prompt: "An account makes requests to list many student documents it can access. Which high-level ATT&CK tactic is a defensible conditional label for the observation?",
+    options: [
+      {
+        id: "A",
+        text: "Credential Access, because any account request proves credentials were obtained improperly."
+      },
+      {
+        id: "B",
+        text: "Discovery may be relevant, because the question concerns learning what resources are available; the observation alone does not establish intent, a technique, or a malicious actor."
+      },
+      {
+        id: "C",
+        text: "Impact, because listing documents necessarily changed or damaged them."
+      },
+      {
+        id: "D",
+        text: "Technique, because tactic and technique are the same level of description."
+      }
+    ],
+    correctOption: "B",
+    feedback: {
+      correct: "Correct. A tactic names a high-level goal (here, potentially learning available resources); a technique would describe how. One observation does not establish intent, identity, or a technique without more context.",
+      incorrect: "Keep the levels distinct: a tactic is the possible high-level goal, while a technique is how it might be pursued. An observation is not, by itself, proof of intent, identity, or a technique."
+    }
+  },
+  {
+    id: "C2-5",
+    mlo: "MLO2.5",
+    title: "Qualitative risk prioritization",
+    prompt: "Scenario A is a renamed public announcement file on an ordinary day with another communication channel. Scenario B is a grade-change role whose access may be broader than needed; role policy, approvals, and logs are not yet known. Which provisional priority is best supported?",
+    options: [
+      {
+        id: "A",
+        text: "Always prioritize A, because any public-file change has maximum likelihood and impact."
+      },
+      {
+        id: "B",
+        text: "Prioritize B provisionally: its impact could be high for grade integrity, while likelihood remains conditional; verify the role matrix, approvals, and records, and revisit A if a key date or no fallback channel changes its impact."
+      },
+      {
+        id: "C",
+        text: "Treat both as confirmed incidents, so qualitative likelihood and impact are unnecessary."
+      },
+      {
+        id: "D",
+        text: "Assign precise numerical probabilities without documenting assumptions, because numbers remove uncertainty."
+      }
+    ],
+    correctOption: "B",
+    feedback: {
+      correct: "Correct. Qualitative prioritization connects likelihood and impact to known conditions, records uncertainty, and can change when evidence such as approvals, role limits, or fallback channels changes.",
+      incorrect: "A qualitative priority is provisional and reasoned: state the conditions behind likelihood and impact, name what is unknown, and identify evidence that could change the order."
+    }
   }
-  const ratio = (maxTimeSeconds - timeElapsedSeconds) / maxTimeSeconds;
-  return basePoints + Math.floor(basePoints * 0.5 * ratio);
-}
+];
 
 function evaluateThreatOutcome(scores) {
   const correct = scores.S.correct + scores.T.correct + scores.R.correct + scores.I.correct + scores.D.correct + scores.E.correct;
   const total = scores.S.total + scores.T.total + scores.R.total + scores.I.total + scores.D.total + scores.E.total;
   const accuracy = total > 0 ? (correct / total) * 100 : 0;
 
-  let title = "Novice Threat Modeler";
+  let title = "Practice band: below 45%";
   let badge = "🔍";
-  let description = "You understand threat concepts. Play again to improve accuracy and identify systemic flaws.";
+  let description = "This local practice set identifies concepts to revisit; it does not certify threat-modeling competence.";
 
   if (accuracy >= 90) {
-    title = "Elite Threat Modeling Architect";
+    title = "Practice band: 90–100%";
     badge = "🏆";
-    description = "Masterful mapping! You successfully secured the boundaries and classified threats according to STRIDE.";
+    description = "High accuracy in this local practice set; it does not certify threat-modeling competence or secure a real boundary.";
   } else if (accuracy >= 70) {
-    title = "Systems Security Auditor";
+    title = "Practice band: 70–89%";
     badge = "🛡️";
-    description = "Strong analytical skills. You correctly identified most trust boundaries and vulnerabilities.";
+    description = "Strong local-practice performance; revisit the scenario assumptions and evidence limits before applying concepts elsewhere.";
   } else if (accuracy >= 45) {
-    title = "AppSec Analyst";
+    title = "Practice band: 45–69%";
     badge = "💻";
-    description = "Good baseline. Pay close attention to DFD nodes and the differences between Spoofing vs Elevation of Privilege.";
+    description = "This practice set shows a developing grasp; revisit DFD nodes and the difference between Spoofing and Elevation of Privilege.";
   }
 
   return {
@@ -254,10 +467,49 @@ function evaluateThreatOutcome(scores) {
   };
 }
 
+function evaluateCheckpointOutcome(scores) {
+  const total = scores.total || 0;
+  const correct = scores.correct || 0;
+  const accuracy = total > 0 ? (correct / total) * 100 : 0;
+
+  let title = "Revisit the Chapter 2 reasoning checkpoints";
+  let badge = "🔍";
+  let description = "Use the feedback to revisit the distinction between observations, assumptions, possible effects, and evidence still needed.";
+
+  if (accuracy === 100) {
+    title = "All Chapter 2 reasoning checkpoints correct";
+    badge = "🏆";
+    description = "This local result shows accurate answers in this practice set; it does not certify threat-modeling competence or secure a real system.";
+  } else if (accuracy >= 60) {
+    title = "Chapter 2 reasoning is developing";
+    badge = "📘";
+    description = "Review the feedback for the missed checkpoint before applying the concepts to a different system or evidence set.";
+  }
+
+  return {
+    accuracy,
+    title,
+    badge,
+    description
+  };
+}
+
+function isCheckpointResponseCorrect(checkpoint, response) {
+  if (!checkpoint || response === null || response === undefined) return false;
+
+  if (Array.isArray(checkpoint.parts) && checkpoint.correctParts) {
+    return checkpoint.parts.every((part) => response[part.id] === checkpoint.correctParts[part.id]);
+  }
+
+  return response === checkpoint.correctOption;
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     LEVELS,
-    calculateScore,
-    evaluateThreatOutcome
+    CHAPTER_TWO_CHECKPOINTS,
+    evaluateThreatOutcome,
+    evaluateCheckpointOutcome,
+    isCheckpointResponseCorrect
   };
 }
